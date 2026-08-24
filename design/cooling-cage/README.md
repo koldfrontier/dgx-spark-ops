@@ -3,7 +3,7 @@
 A screwless, 3D-printed active-cooling cage that holds **two DGX Spark / ASUS Ascent GX10**
 units on edge and drives three 120 mm fans through them.
 
-Original design project:
+Fusion360 project:
 https://a360.co/4xVKE2R
 
 ![Assembled cage](images/hero.png)
