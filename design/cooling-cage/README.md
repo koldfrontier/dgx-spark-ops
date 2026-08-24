@@ -134,12 +134,6 @@ The 3MF groups parts into eleven plates. Standard 3MF has no plate concept, so s
 all objects at once laid out in a grid — use "arrange all" or assign plates by hand. The intended
 grouping is in `design-notes.md`.
 
-## Status
-
-Verified in CAD, **not yet printed.** Fit, clearances, snap-fit strain, assembly paths and
-printability were all checked against the solid model; see `design-notes.md` for what was
-measured and how. Real-world validation is still outstanding — if you print it, please open an
-issue with what you find.
 
 ## License
 
