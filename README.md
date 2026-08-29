@@ -8,6 +8,7 @@ desktop AI machines.
 | Path | What it is |
 |---|---|
 | [`design/cooling-cage`](design/cooling-cage) | Screwless 3D-printed active-cooling cage for two units, with three 120 mm fans. Print files, CAD source, and a full assembly guide. |
+| [`recipes`](recipes) | Reproducible dual-node inference serving configs — launch scripts, tuning data, and honest trust/security notes for specific model checkpoints. |
 
 More to follow.
 
