@@ -1,7 +1,10 @@
 # Design notes
 
 Engineering rationale, the numbers behind the snap features, and how the design was verified.
-Everything here was measured against the solid model in Fusion; none of it has been printed yet.
+Model v33. Everything here was measured against the solid model in Fusion.
+
+**v1 was printed and assembled. Nothing since v1 has been printed** — every figure below for v2
+and later is CAD verification, not experience.
 
 ## Thermal concept
 
@@ -26,48 +29,89 @@ Nothing is screwed. Five mechanisms carry the whole assembly.
 
 | Joint | Mechanism | Numbers |
 |---|---|---|
-| Arm → tray | 45° half-dovetail, slides in from the rear | 0.3 mm clearance, 150 mm travel, hard stop at the front |
-| Arm → brace | Two cantilever latch barbs into catch pockets | 1.40 mm deflection, 0.66 % strain, 5.1 N each, ~15 N to seat |
+| Arm → tray | 45° half-dovetail, slides in from the rear | 0.12 mm clearance both flanks, 150 mm travel, hard stop at the front |
+| Arm → brace | Two cantilever latch barbs into catch pockets | 1.30 mm barb, 0.63 % strain at release, 4.6 N per latch to release, 0.90 mm retained engagement |
 | Grille → collar | Four cantilever hooks, 18 × 1.3 × 10 mm, 1.5 mm barb | 1.08 % strain, 2.8 N per hook, ~11 N to click on |
 | Plenum → brace | Tusk tenon through a mortise, locked by a wedge key | 0.65 mm of taper available for tightening |
-| Button pin → tube | Split shaft, two spring legs, three-section snap barb | 0.63 % strain, ~1.9 N to snap in, ~2.85 N pull-out |
+| Button pin → tube | Split shaft, two spring legs, two-pad snap barb | 0.45 mm squeeze needed against 1.20 mm available |
 
 PETG at E ≈ 2000 MPa throughout. Repeated-use strain allowance for PETG is roughly 1.5–2 %, so
 every flexure has at least 1.5× margin.
 
+The dovetail clearance, the latch geometry and the pin barb are all v2 values. What they replaced
+and why is in [`v2-tolerance-analysis.md`](v2-tolerance-analysis.md) — the v1 pin could not be
+inserted at any force, and the v1 latch could not be released at all.
+
 ### Button pins
 
 Each unit's front power button is behind the plenum, so each gets a captive printed push-pin
-running in a guided tube. Bore profile, measured by ray-sampling the solid at eight angles every
-0.5 mm along the axis:
+running in a guided tube. Bore profile:
 
 | Distance from mouth | Bore radius | Enclosed |
 |---|---|---|
-| −0.5 → 2.5 mm | 2.70 mm | yes |
+| −0.5 → 2.5 mm | 2.90 mm, with a 38° lead-in funnel | yes |
 | 3.0 → 14.0 mm | 4.00 mm (detent chamber) | yes |
 | 14.5 mm → end | 2.70 mm | yes |
 
-That gives a square 1.30 mm shoulder at s = 3.0. The pin's barb reaches r = 3.65, so it engages
-0.95 mm per side and cannot be pulled back through the mouth without compressing both legs
-0.95 mm — which the 2.2 mm slot allows, with 0.3 mm to spare before the halves touch.
+The barb is **two pads on the outer face of each leg**, limited to |v| ≤ 0.80 mm and crowning at
+r = 3.35 — not a revolved ring. That distinction is the whole point: squeezing the legs translates
+each half toward the centreline, which retracts material lying along the squeeze axis and does
+nothing to material 90° away. A ring cannot be squeezed through its own bore; two pads can.
+
+With the legs fully closed the barb envelope measures 2.159 mm against a 2.90 mm mouth. Required
+squeeze is 0.45 mm of the 1.20 mm available, and on a tight printer ≈0.73 mm of 1.10 mm.
 
 Long pin: 20.5° off the button axis, 6.0 mm free stroke, presses at +2.50 mm.
 Short pin: 28.7° off axis, 5.0 mm free stroke, presses at +2.25 mm.
 
-Worst-case gravity on the long pin is 0.0055 N against 2.85 N of retention — a 520× margin.
+## Holding the units still
+
+Each unit is a 150 mm slab. Three constraints hold it:
+
+| Constraint | Position | Where it bears |
+|---|---|---|
+| Inboard | x = 9.5 (tray centre wall) | z 6–30 |
+| Outboard | x = 60.4 (arm shroud collar frame) | y 13.0–15.5 and 135.0–137.5, z 21.0–23.5 and 143.0–145.5 |
+| Top corners | x = 60.4 (brace capture ribs) | z 152–158 |
+
+```
+left-right play = 60.4 - 9.5 - 50.5 = 0.40 mm
+```
+
+Before v2 the outboard face was unconstrained above z = 8 and the unit could slide the full gap
+to the arm plate. The shroud collar does double duty here: it is primarily an air seal, and the
+lateral datum falls out of it for free.
+
+The collar also cut bypass around each fan discharge from 3 580 mm² to 143 mm², a 96 % reduction.
+And it is the reason the arm no longer has a support-free print orientation — see below.
+
+## Clearance for the unit's feet
+
+The GX10 has four rubber feet on its bottom panel, which is the face that looks outward into the
+side fans, so the feet land on the collar. The collar's top wall sits 18-20 mm in from the panel
+edge while the bottom and side walls sit at 13-15 mm; the feet fall in that 5 mm band and foul
+only the top.
+
+The top wall is therefore cut away at both ends, leaving it over y 38.0–112.0 only, mirrored
+about y = 75 so both arms clear at both ends. The reference model of the unit has no feet
+modelled, which is why interference analysis never caught this.
+
+**The foot dimensions were never measured.** The notch is sized from the collar geometry with
+deliberate over-cut, since over-cutting costs nothing here and under-cutting leaves the part
+fouling.
 
 ## Verification
 
 **Interference.** Full-assembly interference analysis returns three pairs totalling 0.3074 cm³,
 all of which are the intended 0.2 mm preload of each grille's four clamp pads against its fan.
-No unintended contact anywhere.
+No unintended contact anywhere. This figure is the baseline: anything else is a new bug.
 
-**Assembly paths.** Every part was stepped along its insertion path in 2 mm increments with a
-full interference check at each step:
+**Assembly paths.** Every part stepped along its insertion path with a full interference check at
+each step:
 
 | Part | Motion | Result |
 |---|---|---|
-| Side fan arms ×2 | slide −Y from the rear | clear 150 mm |
+| Side fan arms ×2 | slide from the rear | clear 150 mm |
 | Front plenum | drop −Z | clear 60 mm |
 | Units ×2 | drop −Z | clear 60 mm |
 | Fans ×3 | push into collar | clear 45 mm each |
@@ -76,23 +120,22 @@ full interference check at each step:
 | Grilles ×3 | clip on | clear to 15 mm, then the hooks ride and snap |
 | Stacking pegs ×4 | press in | clear to home |
 
-**Printability.** Six-direction overhang sweep on every part, 45° threshold, using true outward
-face normals. For each overhanging face the effective bridge span was computed as 2 × area ÷
-perimeter:
+The arms slide in at step 2, before the units drop in at step 4, so the collar never has to sweep
+past a seated unit.
 
-| Part | Best direction | Overhang | Needs real support | Worst bridge |
-|---|---|---|---|---|
-| Base tray | floor down | 0 mm² | 0 | — |
-| Front plenum | back plate down | 8983 mm² | 0 | 12.4 mm |
-| Side fan arm | plate down | 394 mm² | 0 | 3.5 mm |
-| Top brace | top face down | 1517 mm² | 0 | 10 mm |
-| Fan grille | grille face down | 60 mm² | 0 | 1.3 mm |
-| Wedge key, pegs, pins | — | 0–12 mm² | 0 | — |
+**Printability.** Measured as unsupported reach, not overhang area. Eight parts are support-free
+with a worst reach of 5.0 mm; the side fan arm and the front plenum both need support and no
+orientation avoids it. Full measurements, the six-orientation sweep for the arm, and what the
+earlier analysis got wrong are in
+[`printability-analysis.md`](printability-analysis.md).
 
-No face anywhere exceeds a 20 mm span, so no part needs support material.
-
-**Mesh quality.** All ten exported meshes are watertight and 2-manifold, and their computed
-volumes match the CAD solids to 0.1 cm³.
+**Mesh quality.** Exported mesh volumes match the CAD solids to within 0.04 cm³ on every part.
+**Eight of the ten meshes are watertight and 2-manifold. Two are not:**
+`08-button-pin-long` has four edges shared by four faces and two shared by six;
+`09-button-pin-short` has eight and eight. That is the coincident-face signature, and both pins
+were heavily reworked in v2. Whether the B-reps are non-manifold or only the tessellation has not
+been checked. Slicers will repair these silently and by their own rules, which is not what you
+want on the one part that already failed once.
 
 ## Print plate grouping
 
@@ -112,9 +155,12 @@ The grilles are 135 mm square, so only one fits a 248 × 250 mm bed at a time.
 
 ## Things that are still open
 
-- **Nothing has been printed.** All of the above is CAD verification.
+- **Nothing since v1 has been printed.** Everything above about v2 and later is CAD verification.
+- The two non-manifold pin meshes.
 - The centre duct's effectiveness is unproven — see the A/B test note above.
 - Latch, hook and pin-leg stiffness are calculated, not measured.
+- The arm and the plenum need support material. A design fix for the arm — sacrificial ribs or a
+  chamfered transition behind the plate — has not been attempted.
 - The rear exhaust attachment (routing exhaust to top, left or right while keeping port access)
   is designed for but not built. It must mount to the **top brace**, not the tray ears: nothing
   on the ears may exceed 17 mm in height or the arms cannot be fitted.
@@ -122,7 +168,8 @@ The grilles are 135 mm square, so only one fits a 248 × 250 mm bed at a time.
 
 ## Design rules learned the hard way
 
-Two classes of bug in this model were invisible in the viewport and passed interference checks:
+Four classes of bug in this project were invisible in the viewport and passed the checks that
+were run against them:
 
 1. **Feature order.** Joining material into a region that already has holes through it refills
    those holes. Re-cut any bore after a later join crosses it.
@@ -130,6 +177,12 @@ Two classes of bug in this model were invisible in the viewport and passed inter
    construction plane perpendicular to *its own* axis. Lofting between global-axis planes
    produces oblique cylinders — elliptical in true section, with smeared shoulders that will not
    retain a snap feature.
+3. **Reference geometry is not the real thing.** The unit's reference model has no rubber feet,
+   so no amount of interference analysis was ever going to find the collar fouling them.
+4. **A fix in one dimension can break another.** The shroud collar solved the air bypass and the
+   lateral play at once, and silently removed the arm's only support-free print orientation.
 
-And the general one: **verify fits by sampling the solid, not by eye.** A missing tube wall that
+And the general ones: **verify fits by sampling the solid, not by eye** — a missing tube wall that
 left a snap pin completely unretained passed every interference check that was run against it.
+**And re-measure any result that says a hard part is easy.** The claim that a 13 000 mm² plate
+held up by two rails printed support-free stood for two releases.

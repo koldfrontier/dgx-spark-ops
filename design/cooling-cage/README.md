@@ -3,9 +3,6 @@
 A screwless, 3D-printed active-cooling cage that holds **two DGX Spark / ASUS Ascent GX10**
 units on edge and drives three 120 mm fans through them.
 
-Fusion360 project:
-https://a360.co/4xVKE2R
-
 ![Assembled cage](images/hero.png)
 
 There is not a single screw, heat-set insert or drop of glue in the assembly. Everything
@@ -16,11 +13,11 @@ wedge key.
 |---|---|
 | Fans | 3 × 120 mm |
 | Fasteners | none |
-| Assembled size | 206 × 253 × 190 mm |
-| Filament | ~570 g PETG at 20 % infill |
+| Assembled size | 206 x 253 x 190 mm |
+| Filament | ~580 g PETG at 20 % infill (estimate) |
 | Printed parts | 15 (10 unique) |
 | Bed needed | 248 × 250 mm (largest part is 176 × 220 mm) |
-| Supports | none, on any part |
+| Supports | needed on the arm and the plenum; none on the other eight parts |
 
 ## How it works
 
@@ -46,21 +43,18 @@ face and the other near the bottom — hence two different captive push-pins.
 | Part | Qty | Size mm | Print orientation | Support |
 |---|---|---|---|---|
 | `01-base-tray` | 1 | 176 × 220 × 46 | as exported | none |
-| `02-front-plenum` | 1 | 139 × 180 × 66 | as exported | none¹ |
-| `03-side-fan-arm` | 2 | 172 × 166 × 30 | as exported | none |
+| `02-front-plenum` | 1 | 139 × 180 × 66 | as exported (back plate down) | **yes** |
+| `03-side-fan-arm` | 2 | 171.6 × 166 × 39.6 | as exported (fan collar up) | **yes** |
 | `04-top-brace` | 1 | 156 × 190 × 30 | as exported | none |
 | `05b-fan-grille-25mm` | 3 | 135 × 135 × 21 | as exported | none |
 | `05-fan-grille-26mm` | 3 | 135 × 135 × 21 | as exported | none |
 | `06-wedge-key` | 1 | 10 × 6 × 41 | as exported | none |
 | `07-stacking-peg` | 4 | Ø10 × 20 | as exported | none |
-| `08-button-pin-long` | 1 | 15 × 7 × 76 | as exported | none |
+| `08-button-pin-long` | 1 | 15 × 30.5 × 72.5 | as exported | none |
 | `09-button-pin-short` | 1 | 10 × 10 × 46 | as exported | none |
 
 Every STL and the 3MF are already **in their correct print orientation, sitting on Z = 0**.
 Drop them in and slice — do not rotate.
-
-> ¹ The plenum reports a large overhang area, but every one of those faces is a bridge. The
-> widest unsupported span anywhere in the design is 12.8 mm, so no part needs support material.
 
 **Print only one grille variant.** `05b` has 2.2 mm clamp pads for **25 mm** thick fans;
 `05` has 1.2 mm pads for **26 mm** fans. The pads preload the fan against its sealing land, so
@@ -81,8 +75,33 @@ the wrong variant leaves the fan loose and buzzing.
 - **0.4 mm nozzle, 0.2 mm layers.**
 - **4 perimeters minimum.** Thin walls halve the strength of every snap feature.
 - **20 % infill** is plenty. Nothing is structural beyond the flexures.
-- **Supports off** on every part.
-- **Brim** on `08-button-pin-long` — it stands 76 mm tall on a 15 × 4 mm foot.
+- **Supports on for `02-front-plenum` and `03-side-fan-arm`, off for everything else.** Both of
+  those parts carry a large flat panel that starts in mid-air, and neither has an orientation
+  that avoids it — see [`docs/printability-analysis.md`](docs/printability-analysis.md) for the
+  measurements and the six-orientation sweep. Tree supports on the arm's plate underside are
+  enough; the plenum wants normal supports under its front face.
+- **No brim needed.** The long button pin prints on a 15 × 30.5 mm footprint at 72.5 mm tall.
+
+> An earlier version of this README claimed no part needed support. That was wrong: the v2
+> shroud collar removed the arm's only support-free orientation, and the reach figures behind
+> the claim did not survive re-measurement. The two large parts need support.
+
+## Fitting the GX10's rubber feet
+
+![Foot clearance notches](images/notch_detail.png)
+
+The GX10 has four rubber feet on its bottom panel, and that panel is the face that looks
+outward into the side fans — so the feet land on the shroud collar. The collar's top wall is
+notched at both ends to clear them: the top wall runs only over the middle of the span, and the
+two end sections are open.
+
+If you are printing from the current files this is already done. If you have arms printed from
+an earlier release, cut the top wall away from each collar corner to the far edge of the latch
+snap on both sides, at both ends of both arms.
+
+The foot dimensions were never measured — the notch is sized from the collar geometry with
+deliberate margin. If a foot still fouls, open an issue with the foot diameter, height and
+centre positions.
 
 ## Assembly
 
@@ -115,6 +134,10 @@ floor exit into the tunnel between the tray ear and the arm collar, then runs re
 gland and out the back of the tray. The front fan's lead exits a side window in the plenum skirt
 and joins the same tunnel.
 
+Every restriction on that route passes a 14 × 8 mm fan connector: the arm cable windows are
+16.5 × 10.0 mm, the plenum skirt windows 21.5 × 10.0 mm per side, the plenum rear slot
+10.5 × 16.5 mm per side, and the fan-pocket floor slots 15.5 mm (arm) and 14.3 mm (plenum).
+
 The run sits entirely outboard of the exhaust footprint and below the port strip, so nothing is
 in the hot stream and nothing crosses the rear ports.
 
@@ -130,6 +153,8 @@ print/  dgx-spark-cooling-cage.3mf     all parts, grouped by print plate
         stl/*.stl                      one file per part, print-oriented
 docs/   assembly-guide.pdf             10-page illustrated guide
         design-notes.md                engineering rationale and verification
+        printability-analysis.md       orientation and support measurements
+        v2-tolerance-analysis.md       what the first print got wrong, and by how much
 images/                                renders used above
 ```
 
@@ -137,6 +162,32 @@ The 3MF groups parts into eleven plates. Standard 3MF has no plate concept, so s
 all objects at once laid out in a grid — use "arrange all" or assign plates by hand. The intended
 grouping is in `design-notes.md`.
 
+## Status
+
+**v3 — v2's faults fixed in CAD, still unprinted.** The v1 design was printed and assembled;
+four problems showed up that CAD had not caught, and all four are fixed:
+
+- the button pin could not be inserted at all (the barb was a full ring that squeezing could not
+  shrink — a geometric impossibility, not a tolerance issue)
+- the arm latches could not be released (the access window was aimed 1.5 mm above the barb)
+- air bypassed the units through a 10 mm gap around each fan discharge
+- the units slid side to side, unconstrained outboard above z = 8
+
+Then two more that only turned up later:
+
+- the GX10's rubber feet fouled the shroud collar — the reference model has no feet, so CAD
+  never saw it. Notched, see above.
+- the collar left the arm with no support-free print orientation, and the plenum had been
+  re-oriented onto a worse one. Both re-measured, the plenum re-exported, and the support
+  claim in this README corrected.
+
+See [`docs/v2-tolerance-analysis.md`](docs/v2-tolerance-analysis.md) for the measurements behind
+the first four fixes. Interference, assembly paths, printability and mesh quality are all
+re-verified against the current solids; **nothing since v1 has been printed.**
+
+Two known defects are open: `08-button-pin-long.stl` and `09-button-pin-short.stl` are
+non-manifold (a handful of edges shared by four and six faces), which slicers will silently
+repair in their own way. The B-reps have not been checked yet.
 
 ## License
 
