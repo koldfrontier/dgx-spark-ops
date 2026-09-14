@@ -160,8 +160,8 @@ that ~10% is the number to weigh against the ring's simplicity.
 
 **Channel count.** `NCCL_MAX_NCHANNELS=8` (from the same speed run, +10.7% C6
 on a switch) measured neutral on the cycle as its own boot: C6 +1.4%, decode
-step and prefill inside run-to-run noise, NCCL pinned memory doubled. The
-ring-only build's 4 channels stay.
+step and prefill inside run-to-run noise, NCCL's pinned `Shmem` on the head
+0.48 -> 0.62 GiB. The ring-only build's 4 channels stay.
 
 If you do move to a switch, RoCE on a small managed switch wants **lossy mode
 with QoS off**, not the lossless-PFC setup datacenter documentation assumes;

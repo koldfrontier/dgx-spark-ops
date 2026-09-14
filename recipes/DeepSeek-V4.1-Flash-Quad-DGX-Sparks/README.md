@@ -280,7 +280,7 @@ From the same speed run, tried or dispositioned on this fleet:
 
 - **`NCCL_MAX_NCHANNELS=8`** — +10.7% C6 on their switched fleet. Here, as its
   own boot against boot 6: C6 154.2 vs 152.1, everything else inside
-  run-to-run noise, NCCL pinned memory doubled. Neutral on the cycle (which is
+  run-to-run noise, NCCL's pinned `Shmem` +29% on the head. Neutral on the cycle (which is
   what sparkring's own thread reports); reverted to 4.
 - **b12x RoCE one-shot all-reduce** — their biggest decode lever (code +11%,
   prose +16%). It is a one-shot all-to-all RDMA collective on a single HCA;
