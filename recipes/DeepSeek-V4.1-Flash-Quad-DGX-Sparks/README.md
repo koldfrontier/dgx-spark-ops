@@ -12,14 +12,15 @@ bought, no switch needed.
 | Shape | TP4 across 4 × GB10, rank 0 serves the API |
 | Checkpoint | 475 GiB, one copy on the head, read by the others over NFS |
 | Per-rank weights | 81.58 GiB resident |
-| Context | 300,000 (boot 2/4) or **1,048,576** (boot 5) |
+| Context | 300,000 (boot 2/4), **524,288** (boot 6, serving) or 1,048,576 (boot 5) |
 | Speculative decoding | DSpark k=5, measured acceptance 3.55 over a 20-minute mixed soak |
 | Vision + tool calling | both on, 7/7 on a real-image / real-tool-call suite |
-| Decode | **62–63 ms/step**, 92.8 tok/s counting, C1 55–57 per-stream, C6 144–152 aggregate |
+| Decode | **62–63 ms/step**, 93 tok/s counting, C1 55–57 per-stream, C6 144–152 aggregate |
+| Cold prefill | 1,755 / 2,152 / 1,958 / 1,590 tok/s at 3K / 12K / 47K / 93K tokens (boot 6); 1,485 at 130K, ~1,250 at 300K |
 | Long context | needle exact at **298K / 596K / 993K** tokens |
 | Transport | [FujitsuPolycom/sparkring](https://github.com/FujitsuPolycom/sparkring) patched NCCL 2.30.7, four-rank switchless cycle |
 | Fabric cost | 4.64 ms of a 63 ms decode step; 531.1 GB per ring link over a 20-min soak |
-| Last verified | 2026-09-14 on the hardware described below |
+| Last verified | 2026-09-14 on the hardware described below (boot 6) |
 
 It does **not** fit at TP2 in any layout, so this is a four-node workload or
 nothing: while it serves, everything else on those four machines is down.
@@ -37,9 +38,10 @@ What is here and not there:
   routing, the failure modes and the measured cost of the topology are in
   [`../../notes/ring-ops.md`](../../notes/ring-ops.md).
 - **Boot profiles as files**, not flags in your shell history: a gate profile,
-  a 300K serving profile, a fair-prefill profile, a 1M profile. Changing the
-  serving shape is `cp profiles/<x>.env ~/boot.env && ring-cluster.sh start`,
-  and a rollback is the same command with the old file.
+  a 300K serving profile, a fair-prefill profile, a 1M profile, and the
+  current 500K profile with the Engram fast path. Changing the serving shape
+  is `cp profiles/<x>.env ~/boot.env && ring-cluster.sh start`, and a
+  rollback is the same command with the old file.
 - **Fairness under mixed load.** `--long-prefill-token-threshold` measured from
   both sides: what it buys a co-scheduled stream, and what it costs the long
   request.
@@ -235,6 +237,61 @@ in got its first token in 2.4 s and then a chunk **every 1.03 s** at
 1,635), and nothing below it — prompts under the threshold, and prefix-cached
 turns that add fewer new tokens than the threshold, are unaffected. `4096`
 halves both the benefit and the cost; `8192` is a no-op.
+
+### Boot 6: Engram fast staging, 128 read threads, 500K window
+
+tonyd2wild ran a 40-boot speed run on 2026-09-14 (one change per boot, on
+their EXL3 3.5-bpw lane). Two of its levers are Engram-path changes and so
+lane-independent — the Engram tables are the same on the native checkpoint —
+and both transfer:
+
+- `DSV41_ENGRAM_FAST=1`: their `engram.py` is byte-for-byte the boot-10
+  `engram.py` plus a 151-line env-gated diff (memmap row gather on the read
+  pool, raw fp8 rows + scales to the GPU, dequant there). Verified by applying
+  their `engram-fast.diff` to our file and comparing md5s — the same check as
+  for any whole-file patch, below.
+- `ENGRAM_THREADS=128` (was 32).
+
+Plus `MAXLEN=524288`: 500K is enough here, and the pool goes from 1.9× a 1M
+request to **4.9–5.2× a 500K one** (2.55–2.71M tokens across three boots).
+
+| | boot 5 (1M) | boot 6 (500K, fast path) |
+|---|---:|---:|
+| decode, counting | 62.4–63.6 ms/step | 62.0 ms/step, 93 tok/s |
+| C1 / C6 | 55.2 / 143.8 | 54.7 / **152.1** |
+| cold prefill 2,950 tok | 1,470–1,538 | **1,755** (+16%) |
+| cold prefill 11,592 tok | 1,452 | **2,152** (+48%) |
+| cold prefill 46,810 tok | 1,538 | **1,958** (+27%) |
+| cold prefill 93,335 tok | 1,520 | 1,590 (+5%) |
+| needle 130,258 tok | 1,474–1,488 | 1,485 (same, exact) |
+| needle 298,172 tok | 1,340 | 1,235 / 1,256 (−7%, exact, repeated) |
+| vision + tools | 7/7 | 7/7 |
+
+The gain falls monotonically with prompt length and goes slightly negative at
+300K. `vmstat` during a 300K prefill showed ~0 disk reads and an idle CPU on
+head and worker, so it is neither the memmap thrashing nor 128 threads
+contending: the fast path moves dequant onto the GPU, which pays where the
+CPU gather was the bottleneck and costs a little where the GPU already is
+(the sparse indexer's share grows with context). Keep it if your prompts are
+mostly under 100K; a `DSV41_ENGRAM_FAST=0` boot, everything else equal, is
+the A/B if you need the 300K number back.
+
+From the same speed run, tried or dispositioned on this fleet:
+
+- **`NCCL_MAX_NCHANNELS=8`** — +10.7% C6 on their switched fleet. Here, as its
+  own boot against boot 6: C6 154.2 vs 152.1, everything else inside
+  run-to-run noise, NCCL pinned memory doubled. Neutral on the cycle (which is
+  what sparkring's own thread reports); reverted to 4.
+- **b12x RoCE one-shot all-reduce** — their biggest decode lever (code +11%,
+  prose +16%). It is a one-shot all-to-all RDMA collective on a single HCA;
+  a ring cannot do it. This is the first concrete decode number a switch
+  would buy on this workload.
+- **`expandable_segments:False`** — they keep it at no speed cost; on our
+  NCCL path it cost 19–37% decode when A/B'd (their small all-reduces bypass
+  NCCL via b12x, plausibly why they don't pay). Rejected here.
+- Indexer prefill TP-split (+6% at 131K for them; applies cleanly to the
+  boot-10 indexer file) — not tried yet, small.
+- The SGLang lane — 2–2.5× slower, their own verdict.
 
 ## Verifying a whole-file patch before you mount it
 

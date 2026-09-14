@@ -12,7 +12,7 @@ vendor claims taken at face value.
 |---|---|---|
 | [`SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks`](SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks) | [`Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX`](https://huggingface.co/Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX) | 304B-class MoE, 1M context, checkpoint author's forked vLLM runtime |
 | [`Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks`](Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks) | [`Qwen/Qwen3.8-Flash-Next-FP8`](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8) | Native FP8, MTP speculative decoding, vision, 262K context |
-| [`DeepSeek-V4.1-Flash-Quad-DGX-Sparks`](DeepSeek-V4.1-Flash-Quad-DGX-Sparks) | [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) | **Four** nodes on a switchless ring — no switch required. 300K or 1M context, DSpark speculation, vision + tools, boot profiles |
+| [`DeepSeek-V4.1-Flash-Quad-DGX-Sparks`](DeepSeek-V4.1-Flash-Quad-DGX-Sparks) | [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) | **Four** nodes on a switchless ring — no switch required. 300K / 500K / 1M context, DSpark speculation, vision + tools, boot profiles, Engram fast staging |
 
 ## Conventions across recipes
 

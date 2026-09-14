@@ -149,7 +149,19 @@ Where a switch does win: **more than four nodes** (a ring's hop count grows,
 a star's does not), any-to-any collectives (expert parallel, all-to-all),
 pipeline-parallel layouts, resilience (one dead cable takes down a ring, not a
 star), and running stock NCCL instead of a patched build. Those are the reasons
-to buy one — not tok/s.
+to buy one — mostly not tok/s.
+
+The one concrete tok/s exception so far: tonyd2wild's speed run measured a
+**one-shot RoCE all-reduce** (local-inference-lab's b12x, replacing NCCL for
+small collectives) at code +11% / prose +16% single-stream on a switched
+four-Spark fleet. It is an all-to-all RDMA write on one HCA, so a ring cannot
+run it. If you are choosing between the topologies for a TP4 decode workload,
+that ~10% is the number to weigh against the ring's simplicity.
+
+**Channel count.** `NCCL_MAX_NCHANNELS=8` (from the same speed run, +10.7% C6
+on a switch) measured neutral on the cycle as its own boot: C6 +1.4%, decode
+step and prefill inside run-to-run noise, NCCL pinned memory doubled. The
+ring-only build's 4 channels stay.
 
 If you do move to a switch, RoCE on a small managed switch wants **lossy mode
 with QoS off**, not the lossless-PFC setup datacenter documentation assumes;
