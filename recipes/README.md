@@ -1,7 +1,8 @@
 # Recipes
 
-Reproducible serving configs for specific model checkpoints on **dual DGX
-Spark / ASUS Ascent GX10** clusters. Each recipe is a standalone directory:
+Reproducible serving configs for specific model checkpoints on **DGX Spark /
+ASUS Ascent GX10** clusters — two nodes or four. Each recipe is a standalone
+directory:
 launch scripts, what's genericized vs. what you need to fill in for your own
 hardware, trust notes on any third-party image or toolkit involved, and
 honest tuning/benchmark data from the hardware it was developed on — not
@@ -11,6 +12,7 @@ vendor claims taken at face value.
 |---|---|---|
 | [`SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks`](SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks) | [`Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX`](https://huggingface.co/Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX) | 304B-class MoE, 1M context, checkpoint author's forked vLLM runtime |
 | [`Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks`](Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks) | [`Qwen/Qwen3.8-Flash-Next-FP8`](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8) | Native FP8, MTP speculative decoding, vision, 262K context |
+| [`DeepSeek-V4.1-Flash-Quad-DGX-Sparks`](DeepSeek-V4.1-Flash-Quad-DGX-Sparks) | [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) | **Four** nodes on a switchless ring — no switch required. 300K or 1M context, DSpark speculation, vision + tools, boot profiles |
 
 ## Conventions across recipes
 
@@ -31,3 +33,9 @@ vendor claims taken at face value.
 - **Security tradeoffs are stated, not silently made for you.** If a recipe
   binds an API to something broader than a private network by default, it
   says so and tells you how to tighten it.
+- **Each recipe says when it was last verified**, and on what. A recipe whose
+  hardware has since been repurposed still tells you what it did on the day it
+  was measured — it just does not pretend that was this morning.
+
+Topology-level findings that are not specific to one checkpoint live in
+[`../notes`](../notes).

@@ -1,0 +1,66 @@
+# ring.conf - the only file that describes YOUR hardware. Copy to ring.conf
+# next to the launcher and fill in real values on every node (identical copy
+# on all four). Nothing here is a default: every value below must be read off
+# your own machines. See "Finding your own values" in the recipe README.
+#
+# Ring order is rank 0 -> 1 -> 2 -> 3 -> 0. Rank 0 is the head (serves the API
+# and holds the checkpoint). Cable the cycle so each rank's two QSFP ports face
+# its two neighbours, and confirm it with LLDP before you trust this file.
+
+# Hostname of each rank, as `hostname` prints it. The launcher refuses to start
+# a rank on the wrong machine; this is the check that makes that possible.
+RANK0_HOST=spark-0
+RANK1_HOST=spark-1
+RANK2_HOST=spark-2
+RANK3_HOST=spark-3
+
+# RDMA devices facing the two ring neighbours, in `ibv_devices` naming.
+# These differ between machines of the same model - read them per node.
+RANK0_HCA=rocep1s0f0,rocep1s0f1
+RANK1_HCA=rocep1s0f0,rocep1s0f1
+RANK2_HCA=rocep1s0f0,rocep1s0f1
+RANK3_HCA=rocep1s0f0,rocep1s0f1
+
+# RoCEv2 GID index, PER NODE. Do not copy these between machines: the same
+# hardware model enumerates the table differently depending on which addresses
+# are configured. Derive each one (recipe README) and let the launcher's GID
+# preflight refuse the boot if it is wrong.
+RANK0_GID=
+RANK1_GID=
+RANK2_GID=
+RANK3_GID=
+
+# Fabric (RoCE link) IPv4 address and interface per rank. One /24 per link.
+RANK0_FAB_IP=10.0.10.1
+RANK0_FAB_IF=enp1s0f0np0
+RANK1_FAB_IP=10.0.10.2
+RANK1_FAB_IF=enp1s0f0np0
+RANK2_FAB_IP=10.0.20.1
+RANK2_FAB_IF=enp1s0f1np1
+RANK3_FAB_IP=10.0.30.1
+RANK3_FAB_IF=enp1s0f1np1
+
+# Address the API binds to on the head, and the interface the control plane
+# (rendezvous, Gloo, TP sockets) uses when CTRL=private. Use a private/VPN
+# address, not 0.0.0.0 - see "Security posture" in the recipe README.
+RANK0_API_IP=192.0.2.10
+RANK0_PRIV_IP=192.0.2.10
+RANK1_PRIV_IP=192.0.2.11
+RANK2_PRIV_IP=192.0.2.12
+RANK3_PRIV_IP=192.0.2.13
+PRIV_IF=tailscale0
+
+# Checkpoint path. The head reads it locally; the other three read it over
+# whatever share you set up (NFS here), at an identical path.
+MODEL_HOST_RANK0=/srv/models
+MODEL_HOST_WORKERS=/mnt/head-models
+MODEL_DIR=DeepSeek-V4.1-Flash
+
+# Host paths for the compile caches, the patched NCCL, the patch set and the
+# node-local Engram rows. Keep these off /tmp and /var/tmp - both are wiped on
+# reboot on a stock DGX Spark, and a wiped Triton cache costs minutes per boot.
+CACHE_HOST_PATH=$HOME/dsv41-cache
+NCCL_SO_HOST=$HOME/sparkring-nccl/libnccl.so.2.30.7
+NCCL_SO_SHA256=
+PATCH_ROOT=$HOME/patches
+ENGRAM_LOCAL_ROOT=$HOME/engram-local

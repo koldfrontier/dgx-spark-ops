@@ -16,6 +16,7 @@ DGX Spark / ASUS Ascent GX10** units.
 | Vision | working (confirmed with a real image, not just config) |
 | Concurrency | `--max-num-seqs 4` (deliberately chosen, not the image's own default — see **Concurrency tuning**) |
 | Measured peak throughput | ~80 tok/s aggregate (8-way concurrency, reproduced across 3 independent runs) |
+| Last verified | 2026-09-09 on the reference pair (see **Status**) |
 
 There is **no official vLLM support for this checkpoint yet** — the
 architecture ships in two unmerged upstream PRs
@@ -55,14 +56,18 @@ moving on.
    ask the operator whether that's acceptable for their network, or
    whether to bind a private/tailnet address instead, and edit `launch.sh`
    accordingly. This is a real security tradeoff, not a cosmetic flag.
-6. Verify before declaring success: `curl <host>:8888/health` returns 200,
+6. **Verify RDMA is actually carrying the tensor-parallel traffic** before
+   you believe any throughput number — see "Verify the transport by counters"
+   below. NCCL falls back to TCP silently and the endpoint looks perfectly
+   healthy while running at roughly half speed.
+7. Verify before declaring success: `curl <host>:8888/health` returns 200,
    `/v1/models` shows `qwen` with `max_model_len: 262144`, and one real
    chat completion returns coherent content. If the operator specifically
    asked for vision or MTP, verify those with real requests and real
    `/metrics` counters per "Verifying MTP and vision are actually
    working" below - a successful boot log is not proof either is actually
    working.
-7. If asked to raise `--max-num-seqs` above `4`, read "Concurrency tuning"
+8. If asked to raise `--max-num-seqs` above `4`, read "Concurrency tuning"
    below first: `5` measured no better than `4`, and `6`'s apparently
    higher peak did not reproduce and came with real (if non-fatal) memory
    pressure. Don't chase a higher number without re-running the same
@@ -211,6 +216,60 @@ around 90%+ system memory utilization from other concurrent activity), your
 own results may differ — this is a starting point, not a universal
 constant. `MAX_NUM_SEQS=<n> ./launch.sh` overrides it.
 
+## Verify the transport by counters
+
+The most expensive failure we hit on this pair had nothing to do with the
+model: **NCCL silently fell back to TCP over the management network**. The
+endpoint was healthy, generations were correct, and throughput was about half
+what it should have been — for hours, while we looked at the GPU and the
+config. It survived a full reboot, cable swaps and a byte-verification of the
+checkpoint, because none of those touch container device access.
+
+Snapshot the RDMA counters on both nodes before and after one real generation:
+
+```bash
+for d in /sys/class/infiniband/roce*; do
+  echo "$(basename $d) xmit=$(cat $d/ports/1/counters/port_xmit_data)"
+done
+cat /sys/class/net/<fabric-if>/statistics/tx_bytes
+```
+
+(IB counters are in units of 4 bytes.) If `port_xmit_data` does not move,
+NCCL is not using RDMA whatever the config says. On the reference pair, after
+the fix, a single 300-token generation moved **~962 MB** over RDMA — against
+**zero** before it, with ~925 MB of TCP traffic that dropped to 153 KB of
+control chatter.
+
+What fixed it, in the container the toolkit launches: `NCCL_NET=IB` (which
+turns the silent fallback into a loud `NET/IB : No device found`), explicit
+`NCCL_IB_GID_INDEX` / `NCCL_IB_ROCE_VERSION_NUM=2`, `--ulimit memlock=-1:-1`,
+and device access to `/dev/infiniband`. The GID index is **per machine** —
+derive it on each node, never copy your neighbour's.
+
+Measured before and after on the same benchmark and the same pair:
+
+| concurrency | before (TCP fallback) | after (RDMA) |
+|---|---:|---:|
+| C1 | — | 23.28 |
+| C2 | — | 50.75 |
+| C4 | — | 66.23 |
+| C6 | — | 76.83 |
+| C8 | **48.57** | **85.66** |
+
+## Stop and start order
+
+Two things that look like hardware mysteries and are not:
+
+- **Launch the headless worker (rank 1) before the head (rank 0)**, and stop
+  in the opposite order. Launching the head first "works" every time and
+  produced a reproducible ~40% throughput regression that survived a full
+  reboot. The toolkit's own log sequences worker before head; match it.
+- **Never `pkill -f 'vllm serve'`.** vLLM renames its `EngineCore` and
+  `Worker_TP*` children, so that pattern kills the launcher and leaves the
+  workers orphaned — holding the GPU and the port, silently contending with
+  your next launch. Kill by PID and confirm `nvidia-smi` shows no compute
+  process before relaunching.
+
 ## Verifying MTP and vision are actually working
 
 Boot-log confirmation alone isn't proof a feature is doing anything —
@@ -265,7 +324,14 @@ launch.sh       genericized launch command (toolkit + image + vLLM args)
 
 ## Status
 
-Running in production on the reference two-node pair at `--max-num-seqs 4`.
+**Last verified 2026-09-09** on the reference two-node pair at
+`--max-num-seqs 4`, with the RDMA fix above in place. Those four machines have
+since been repurposed to serve a single four-node workload
+([`../DeepSeek-V4.1-Flash-Quad-DGX-Sparks`](../DeepSeek-V4.1-Flash-Quad-DGX-Sparks)),
+so the numbers here are what this configuration did on that date, not a fresh
+run — the config itself is unchanged and the checkpoint and toolkit are still
+current.
+
 The two open items worth knowing about: the `skfine24` image's thin
 single-author trust profile (see **Trust notes**), and the `--host 0.0.0.0`
 default (see **Security posture**) — neither is silently glossed over here,
