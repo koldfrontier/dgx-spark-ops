@@ -25,9 +25,11 @@ patches, the harness and every result.
 | Start to serving | ~3 minutes |
 | Last verified | 2026-10-03, on the hardware below |
 
-**Against the upstream recipe's own three-Spark numbers** (sparkDash, its v1.5 changelog and README; clocks
-capped at 2,200 MHz there, uncapped here): prose at 4 / 8 requests **+9% / +12%**, prefill **+18-20%**, one
-request about the same (75.0 vs 77.6). Upstream's code figures use a different prompt and are not compared.
+**Against the upstream v1.5 three-Spark defaults on the same three Sparks** (harness below): prefill **+7% / +6%**
+at 32K / 128K, one-stream decode **+5-7%**, 4 requests +3%, 8 requests the same. For context only (different
+hardware, clocks capped at 2,200 MHz there): against the upstream README / changelog sparkDash figures, prose at
+4 / 8 requests +9% / +12%, prefill +18-20%, one request 75.0 vs 77.6; our two-Spark runs already measured 7-8%
+above those tables before any tuning. Upstream's code figures use a different prompt and are not compared.
 
 ## What this adds to the upstream recipe
 
@@ -172,8 +174,8 @@ Both apply on top of the upstream recipe's patch set (v1.5, 0001-0070) and chang
   produced the table above.
 - **`0073-tp-remainder-placement.patch`** - `TENSORFOLD_TP_REMAINDER=last` gives a split's remainder units to the
   highest rank instead of rank 0 (MoE 640 / 640 / 768, heads 21 / 21 / 22). The straggler moves to rank 2 and
-  prefill is unchanged (the 6-unit rank still sets the pace), decode within noise - but **rank 0, the API host,
-  holds 9.1 GiB less**, and the shared KV pool (the minimum spare across ranks) grew 0.4-0.7M tokens here.
+  prefill is unchanged (the 6-unit rank still sets the pace); one-stream decode ~2% lower and 4 streams ~3% higher
+  in both starts (each at its noise line) - but **rank 0, the API host, holds 9.1 GiB less**, and the shared KV pool (the minimum spare across ranks) grew 0.4-0.7M tokens here.
 
 To try one without rebuilding the image, bind-mount the patched file into every rank's container at the
 package path (`/usr/local/lib/python3.12/dist-packages/tensorfold/...`) - the upstream `start.sh` has no hook

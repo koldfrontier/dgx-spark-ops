@@ -2,8 +2,8 @@
 # unchanged: first). At three ranks rank 0 - which also serves the API, samples and drafts, and on the head usually
 # shares the machine with other services - then holds MoE 640 instead of 768 of 2,048 columns (9.1 GiB less for
 # GLM-5.3-Flash EXL3 4 bpw), heads 21 instead of 22, drafter KV groups 2 instead of 3; the shared pool, the minimum spare
-# across ranks, grew 0.4-0.7M tokens here. Prefill unchanged (the six-unit rank still sets the pace); decode within
-# noise. Two ranks are unaffected (even splits).
+# across ranks, grew 0.4-0.7M tokens here. Prefill unchanged (the six-unit rank still sets the pace); one-stream decode
+# ~2% lower and 4 streams ~3% higher in both of two starts (each at its noise line). Two ranks are unaffected.
 
 diff --git tensorfold/cuda/shares.py tensorfold/cuda/shares.py
 --- tensorfold/cuda/shares.py
