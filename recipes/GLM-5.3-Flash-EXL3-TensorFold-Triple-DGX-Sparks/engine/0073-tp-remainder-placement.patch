@@ -1,0 +1,34 @@
+# TENSORFOLD_TP_REMAINDER=last: give a split's remainder units to the highest ranks instead of the lowest (default
+# unchanged: first). At three ranks rank 0 - which also serves the API, samples and drafts, and on the head usually
+# shares the machine with other services - then holds MoE 640 instead of 768 of 2,048 columns (9.1 GiB less for
+# GLM-5.3-Flash EXL3 4 bpw), heads 21 instead of 22, drafter KV groups 2 instead of 3; the shared pool, the minimum spare
+# across ranks, grew 0.4-0.7M tokens here. Prefill unchanged (the six-unit rank still sets the pace); decode within
+# noise. Two ranks are unaffected (even splits).
+
+diff --git tensorfold/cuda/shares.py tensorfold/cuda/shares.py
+--- tensorfold/cuda/shares.py
++++ tensorfold/cuda/shares.py
+@@ -1,7 +1,13 @@
+ """How a dimension splits over tensor-parallel ranks: whole units (a head, a 128-column Hadamard block, 64 vocabulary
+-rows), as even as they go, the remainder to the lowest ranks. Two ranks of an even count get exact halves."""
++rows), as even as they go, the remainder to the lowest ranks. Two ranks of an even count get exact halves.
++TENSORFOLD_TP_REMAINDER=last gives the remainder to the highest ranks instead, keeping rank 0 - which also serves
++the API, samples and drafts - on the smaller share."""
+ 
+ from __future__ import annotations
++
++import os
++
++_LAST = os.environ.get("TENSORFOLD_TP_REMAINDER", "first").strip().lower() == "last"
+ 
+ 
+ def parts(total: int, world: int, unit: int = 1) -> list[int]:
+@@ -17,6 +23,8 @@
+     if units < world:
+         raise ValueError(f"{total} ({units} units of {unit}) cannot give each of {world} ranks a unit")
+     base, extra = divmod(units, world)
++    if _LAST:
++        return [(base + (r >= world - extra)) * unit for r in range(world)]
+     return [(base + (r < extra)) * unit for r in range(world)]
+ 
+ 

@@ -1,0 +1,40 @@
+# TF_GLM_PROFILE=1 under --parallel > 1: the multi-stream engine's whole-chunk prompt fills (multi.py _fill) never armed
+# the prefill profiler, so with PARALLEL above 1 (the recipe's default) the only report was the start-up warm-up chunk.
+# Arm it around prefill_chunk as decode.prefill does and report once per prompt, on every rank (so ranks can be
+# compared). Sliced fills (while others decode) and grouped fills stay unprofiled. Tested on v1.5 at three Sparks:
+# 19 reports per rank per benchmark run; off (the default) changes nothing.
+
+diff --git tensorfold/families/glm5_next/cuda/multi.py tensorfold/families/glm5_next/cuda/multi.py
+--- tensorfold/families/glm5_next/cuda/multi.py
++++ tensorfold/families/glm5_next/cuda/multi.py
+@@ -49,6 +49,8 @@
+ from tensorfold.cuda.streams import Stream, next_fill
+ 
+ from . import multi_prefill, sliced_fill
++
++_PROF_BEGIN: dict[int, int] = {}      # TF_GLM_PROFILE: a lane's first profiled prompt row, by id(lane)
+ from .multi_tune import MultiSettings, RoundProfile, allocate, reach_of, sample_packed, scaled_confidence
+ from .pool import ALIGN, Pool, align_up
+ from .verify import BatchedVerify, Segment, SerialVerify, Verified
+@@ -1342,8 +1344,19 @@
+                 out, lane.head = lane.head, None
+             else:
+                 if layers is None:
+-                    out = prefill_chunk(e, prompt, start, stop - start, drafter=self._ctx(lane) if lane.dflash else None,
+-                                        feed=lane.feed, mtp=False, head=stop == n)
++                    # TF_GLM_PROFILE=1 under --parallel: arm the prefill profiler around a whole-chunk fill as the
++                    # serial path does (decode.prefill), and report once per prompt, on every rank
++                    from . import prof
++                    prof.active = prof.ENABLED
++                    try:
++                        out = prefill_chunk(e, prompt, start, stop - start, drafter=self._ctx(lane) if lane.dflash else None,
++                                            feed=lane.feed, mtp=False, head=stop == n)
++                    finally:
++                        prof.active = False
++                    if prof.ENABLED:
++                        begin = _PROF_BEGIN.setdefault(id(lane), start)
++                        if stop == n:
++                            prof.report(n - _PROF_BEGIN.pop(id(lane), begin))
+                 else:
+                     complete, out = sliced_fill.advance(self.partial, *layers, len(self.w.layers),
+                         lambda: prefill_chunk_steps(e, prompt, start, stop - start,

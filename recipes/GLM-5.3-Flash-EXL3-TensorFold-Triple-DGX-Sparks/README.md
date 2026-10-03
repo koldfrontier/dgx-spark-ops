@@ -4,45 +4,44 @@ Serves [`Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold`](https://huggingface.co/M
 as one OpenAI-compatible endpoint, tensor-parallel across **three** DGX Spark / ASUS Ascent GX10 units
 cabled as a **triangle** (one direct QSFP cable per pair, no switch), using
 [MiaAI-Lab's TensorFold recipe](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold)
-and its experimental three-Spark engine (patches 0066-0068).
+v1.5 and its experimental three-Spark engine.
 
-This directory is not a fork of that recipe. It is what we add on top to run it on three nodes: the
-fabric setup and the checks that catch a silently degraded fabric, the start settings we measured, the
-harness, and the numbers.
+This directory is not a fork of that recipe. It is what we add on top to run it well on three nodes: the
+fabric setup and a check that catches a silently degraded fabric, three start settings measured to help,
+a measured map of the settings that do not, a per-rank profile of where the time goes, two optional engine
+patches, the harness and every result.
 
 | | |
 |---|---|
-| Shape | TP3 across 3 x GB10, rank 0 serves the API on `:8888` |
-| Engine | TensorFold v0.6.0 + recipe v1.4 (`cf28cc4`, 68 patches), image `v0.6.0-5e01f1bb74d8` |
+| Shape | TP3 across 3 x GB10, rank 0 serves the API on `:8888`, 8 requests at once |
+| Engine | TensorFold v0.6.0 + recipe v1.5 (`1576746`, 70 patches), image `v0.6.0-9f73cca659a1` |
 | Checkpoint | `078455ff`, 164 GiB, one copy on the head, read by the workers over NFS |
-| Rank 0 memory | startup estimate 68.74 GiB; shared KV pool 4,997,120 tokens (`KV_POOL_GIB=27`) |
-| Serving | 1,048,576-token window, 4 streams, FP8 KV, DFlash2 + copy drafts, vision on |
-| Decode, one stream | prose **66.9** tok/s, code **101.9**; TTFT 152 ms |
-| Decode, 4 streams | prose **123.1** tok/s aggregate |
-| Cold prefill | **2,226 / 2,260** tok/s at ~8K / ~32K tokens (random-word prompts) |
+| Start line | `COMM=roce ./start-tp3.sh` with `NCCL_CHANNELS=8` and `TF_GLM_PREFILL_ROWS=4096` ([`config/local.sh.example`](config/local.sh.example)) |
+| Rank 0 memory | startup estimate 71.1 GiB; shared KV pool ~4.6M tokens |
+| Decode, sparkDash prose | 75.0 tok/s one request · 133.1 at 4 · **186.0 at 8** (aggregate) |
+| Cold prefill, sparkDash | 2,361 / **2,469** / 2,396 / **2,232** tok/s at 16K / 32K / 65K / 131K |
+| Long context | needle at 131K tokens found (2,170 tok/s) |
 | Vision + tool calling | 7/7 on a real-image / real-tool-call suite |
-| Start to serving | 165-190 s |
+| Start to serving | ~3 minutes |
 | Last verified | 2026-10-03, on the hardware below |
 
-Against two Sparks with the same checkpoint and recipe, same harness: prefill +13-15%, one-stream prose
-+23%, code +28%, 4 streams +31%.
-
-> **Status: tuning in progress.** The figures above are measured on a healthy fabric. Our first round of
-> knob measurements was made on a fabric we later found degraded (see [the hotplug note](../../notes/gb10-cx7-hotplug-ltr.md))
-> and has been discarded; a full re-run on the healthy fabric is under way and this file will be updated
-> with it.
+**Against the upstream recipe's own three-Spark numbers** (sparkDash, its v1.5 changelog and README; clocks
+capped at 2,200 MHz there, uncapped here): prose at 4 / 8 requests **+9% / +12%**, prefill **+18-20%**, one
+request about the same (75.0 vs 77.6). Upstream's code figures use a different prompt and are not compared.
 
 ## What this adds to the upstream recipe
 
 - **A fabric check that catches what nothing else does.** Re-cabling a GB10 so that both QSFP cages are
   empty at once leaves its ConnectX-7 at ~1/8 RDMA bandwidth until reboot, with every link, PCIe and MTU
-  check still green. It cost us 45% of prefill. [`fabric/check-fabric.sh`](fabric/check-fabric.sh) reads
-  the marker and runs a loopback bandwidth test per device. Details: [`../../notes/gb10-cx7-hotplug-ltr.md`](../../notes/gb10-cx7-hotplug-ltr.md).
-- **Triangle addressing that survives a peer's reboot** ([`fabric/triangle-addr.sh`](fabric/triangle-addr.sh)),
-  and why DGX OS's NetworkManager profiles undo runtime addressing otherwise.
-- **Measured start settings for three nodes**: `COMM=roce` and `NCCL_CHANNELS=8` ([`config/local.sh.example`](config/local.sh.example)).
-- **A small, repeatable harness** ([`bench/tfbench.py`](bench/tfbench.py)) and every result behind the numbers
-  ([`bench/results-2026-10-03.jsonl`](bench/results-2026-10-03.jsonl)).
+  check still green. It cost us 45% of prefill before we found it. [`fabric/check-fabric.sh`](fabric/check-fabric.sh)
+  reads the marker and runs a loopback bandwidth test per device. Details: [`../../notes/gb10-cx7-hotplug-ltr.md`](../../notes/gb10-cx7-hotplug-ltr.md).
+- **Triangle addressing that survives a peer's reboot** ([`fabric/triangle-addr.sh`](fabric/triangle-addr.sh)).
+- **Three settings that help at three ranks**, each beyond the measured start-to-start noise (below).
+- **A measured map of what does not help**, so you do not spend restarts on it.
+- **A per-rank prefill profile** and two optional engine patches ([`engine/`](engine/)).
+- **The harness** ([`bench/tfbench2.py`](bench/tfbench2.py)), the noise-aware comparison
+  ([`bench/analyze.py`](bench/analyze.py)) and **all 34 v1.5 runs** ([`bench/results-v15-2026-10-03.jsonl`](bench/results-v15-2026-10-03.jsonl));
+  the earlier v1.4 runs with the first harness are in `bench/results-2026-10-03.jsonl` / `bench/tfbench.py`.
 
 ## ---------- AGENT.md ATTENTION ----------
 
@@ -50,17 +49,17 @@ If you are an AI agent setting this up on new hardware, in order, confirming eac
 
 1. **Run `fabric/check-fabric.sh` on every node before the first benchmark**, and again after any
    re-cable or reboot. A node reporting `LTR OFF` or a loopback under ~50 Gb/s gives you wrong numbers
-   for everything; reboot it. Do not tune on top of an unchecked fabric - we did, and threw the results away.
+   for everything; reboot it. Do not tune on top of an unchecked fabric - we did once, and threw the results away.
 2. **Cable a directed triangle**: each node's port 0 to the next node's port 1. Confirm with LLDP or link
-   state, not by trusting labels. A mirrored triangle leaves one pair NCCL cannot connect.
+   state, not by trusting labels.
 3. **Address each PCIe twin on its own /24 per cable**, both ends; both twins carry traffic only when both
    are addressed. Keep NetworkManager off those ports while you run (see `triangle-addr.sh`).
 4. **Check the rendezvous**: `getent hosts $(hostname)` on the head. A loopback answer means you must set
    `MASTER_ADDR` to an address every worker reaches.
 5. **Give `COMM` on the command line** (`COMM=roce ./start-tp3.sh`); `start-tp3.sh` ignores it in
-   `scripts/local.sh`.
-6. **Warm the server before measuring** (a few decode requests and one concurrent wave). TensorFold's first
-   requests after start run slow.
+   `scripts/local.sh`. **`export`** `TF_GLM_*` settings in `local.sh`, or they never reach the ranks.
+6. **Measure noise before you tune.** Three fresh starts of one configuration gave spreads of 0.5% (long
+   prefill), ~1% (one-stream decode) and 3-4% (multi-stream aggregates) here. Anything inside that is not a finding.
 
 ## Hardware and prerequisites
 
@@ -79,7 +78,7 @@ If you are an AI agent setting this up on new hardware, in order, confirming eac
 ```bash
 # head
 git clone https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold && cd GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold
-git checkout cf28cc4          # what was measured; newer releases exist
+git checkout 1576746          # v1.5, what was measured
 cp <this dir>/config/local.sh.example scripts/local.sh   # then fill in
 ```
 
@@ -87,10 +86,10 @@ cp <this dir>/config/local.sh.example scripts/local.sh   # then fill in
    `fabric/check-fabric.sh`. Ping every twin pair from both ends.
 2. **NFS** - export the head's HF cache read-only to every worker link address (both twins of both
    cables), e.g. `/home/<you>/.cache/huggingface <w1-a>(ro,no_subtree_check,all_squash,anonuid=1000,anongid=1000) ...`.
-3. **ssh** - the head must reach each worker *at its link address* with your key (`~/.ssh/config` `Host`
-   block if your key is selected per host).
-4. **Prepare** - `TP=3 scripts/prepare.sh` downloads on the head, copies the image to each worker over the
-   link and checks the workers' NFS view file by file.
+3. **ssh** - the head must reach each worker *at its link address* with your key.
+4. **Prepare** - `TP=3 scripts/prepare.sh` downloads on the head, copies the image to each worker and checks
+   the workers' NFS view file by file. (If you would rather the workers did not pull the image from GHCR
+   themselves, kill their `docker pull` and prepare falls back to streaming it from the head over the link.)
 
 ### Finding your own values
 
@@ -104,42 +103,93 @@ cp <this dir>/config/local.sh.example scripts/local.sh   # then fill in
 ## Run
 
 ```bash
-COMM=roce ./start-tp3.sh            # NCCL_CHANNELS=8 comes from scripts/local.sh
+COMM=roce ./start-tp3.sh            # NCCL_CHANNELS and TF_GLM_PREFILL_ROWS come from scripts/local.sh
 ./stop.sh                           # stops all three ranks
 ```
 
-Expect, in rank 0's log: `rank 0 of 3`; `all-gathers up to 512 KiB over RoCE (rank 1 over <two
-devices>; rank 2 over <the other two> ...)`; `prompt chunks' hyper-connections: rows split between the
-ranks, exchanges by send/receive ...`; then `serving ... rank 0 of 3` after ~2.5-3 minutes.
+Expect, in rank 0's log: `rank 0 of 3`; `all-gathers up to 1024 KiB over RoCE (rank 1 over <two devices>;
+rank 2 over <the other two> ...)`; `prompt chunks' hyper-connections: rows split between the ranks ...`;
+`--parallel 8`; then `serving ... rank 0 of 3`.
 
-## Measured (healthy fabric, 2026-10-03)
+## What moves speed at three ranks (measured)
 
-Harness: [`bench/tfbench.py`](bench/tfbench.py) from a fourth machine over the LAN. Warm-up first; cold
-random-word prompts of ~7.9K and ~31.9K tokens (`max_tokens` 1, tok/s = prompt tokens / wall, median of 2);
-one-stream decode of a prose and a code prompt (256 tokens, temperature 0, thinking off; median of 3 and 2);
-prose at 4 concurrent streams. Random words prefill ~4-8% slower than sparkDash's filler text on this
-model (two comparisons), so compare our prefill to other tables with that in mind. Each run is a fresh start; every run's
-settings were read back from the running container.
+Method: [`bench/tfbench2.py`](bench/tfbench2.py) from a fourth machine over the LAN, warm-up first, then cold
+random-word prefills of ~8K / ~32K / ~128K tokens, one-stream decode of a prose prompt, a copy-friendly code
+prompt (fifty near-identical functions) and a natural code task, and prose and natural code at 4 and 8
+requests at once. One variable per fresh start; every value read back from the running container. Base: v1.5
+with `COMM=roce` and 8 channels, three starts (spread: prefill 32K / 128K 0.6% / 0.5%, prose x1 0.9%, the
+4- and 8-stream aggregates 2.5-4.3%). `*` = beyond that metric's noise. Random words prefill 4-8% slower than
+sparkDash's filler on this model.
 
-| TP3 | prefill ~8K | ~32K | prose x1 | code x1 | prose x4 |
-|---|---:|---:|---:|---:|---:|
-| recipe defaults (`COMM=nccl`, 4 channels) | 2,205 | 2,231 | 62.8 | 99.3 | 118.8 |
-| `COMM=roce` (2 starts, mean) | 2,177 | 2,228 | 67.0 | 102.2 | 122.8 |
-| **`COMM=roce NCCL_CHANNELS=8`** (2 starts, mean) | **2,245** | **2,259** | **67.1** | **102.0** | **122.3** |
-| `COMM=roce TF_GLM_HC_EXCHANGE=gather` | 1,782 | 1,780 | 66.2 | 102.1 | 123.5 |
-| `COMM=roce SPLIT=0` | 1,675 | 1,675 | 66.2 | 102.6 | 122.2 |
-| *TP2 (two of the nodes), recipe defaults* | *1,921* | *1,966* | *54.4* | *80.0* | *93.4* |
+**Helps:**
 
-Single starts unless marked; we have not yet measured the start-to-start spread properly, so read
-differences under ~2% as noise. That is what the re-run is for.
+| setting | prefill 8K / 32K / 128K | one-stream decode | 4 / 8 streams | starts |
+|---|---|---|---|---:|
+| `TF_GLM_PREFILL_ROWS=4096` (default 2048) | +3.7% / **+6.2%*** / **+5.0%*** | same | same | 3 |
+| `COMM=roce` (TP3 default `nccl`) | same (32K / 128K) | **prose +7.3%*, code +5-7%*** | +4% / +2% | 3 v 1 |
+| `NCCL_CHANNELS=8` (default 4) | **+10% / +2.6% / +1.9%** (vs 4) | same | same | 3 v 1 |
+| v1.5 itself (vs v1.4) | same | same | same / **prose +40%, code +35%** | 3 v 1 |
+
+**Defaults that are right at three ranks:** split prefill (`SPLIT=0`: prefill -25%, measured on v1.4), the `p2p`
+split exchange (`gather`: -20%, v1.4), 2 overlap pieces (1: -6%, 4: -3%), L2 prefetch on (off: one-stream decode -2%), draft
+policy `fnc7:0.3` (0.2: same or slightly worse).
+
+**No measurable effect** (each within noise): `TF_ROCE_MAX_KB` 512 / 2048 (auto 1024 at 8 streams),
+`TF_GLM_MULTI_WINDOW=48` (auto 64), `NCCL_CHANNELS=16`, `NCCL_NCHANNELS_PER_NET_PEER=4`,
+`NCCL_P2P_NET_CHUNKSIZE=524288`, `NCCL_BUFFSIZE=8388608`, `vm.compaction_proactiveness=0` (round-gap p99 unchanged
+with smoothing off), `TF_GLM_OVERLAP_PRIORITY=-1` (prefill +1.5% at 32K, decode -1.4 to -2.2% at 4 / 8 streams:
+not worth it), prompt chunks past 4096 (6144: below 4096 at 32K; 8192: +1-1.5% more for 3 GiB more; 4224's
+zero pad rows buy nothing).
+
+**Trade to know about:** 8 requests at once (v1.5's three-Spark default) is throughput, not latency - each
+request runs at ~22 tok/s with 8 in flight against ~33 with 4. One request alone is unaffected.
+
+## Where the time goes (per-rank profile)
+
+One 128K-token prompt, `TF_GLM_PROFILE=1` with [`engine/0072-glm-profile-parallel.patch`](engine/0072-glm-profile-parallel.patch)
+(the profiler reports nothing under `--parallel` without it), 75.8 s timed on every rank (the profiler's syncs
+slow prefill ~22%; the fractions are what to read):
+
+| block | rank 0 | rank 1 | rank 2 |
+|---|---:|---:|---:|
+| MoE total | 35.0 s | 35.1 | 34.9 |
+| routed experts (EXL3) | **18.7** | 16.1 | 16.1 |
+| DSA attention total (token selection 7.9, sparse attention 5.6) | 17.6 | 17.6 | 17.6 |
+| KDA linear attention | 11.9 | 11.9 | 11.8 |
+| hyper-connection glue and its exchanges | 10.7 | 10.6 | 10.9 |
+
+MoE 46%, attention 23%, KDA 16%, glue 14%. **Rank 0 is the routed-expert straggler**: the experts' 2,048
+intermediate columns split in 128-column units, 6 / 5 / 5 over three ranks, so the 6-unit rank takes 16% longer
+and the others wait ~2.6 s of every 128K prompt (~3.4%). Exchanges hide behind the overlap - which is why no
+NCCL setting moved anything.
+
+## Optional engine patches ([`engine/`](engine/))
+
+Both apply on top of the upstream recipe's patch set (v1.5, 0001-0070) and change nothing unless enabled.
+
+- **`0072-glm-profile-parallel.patch`** - `TF_GLM_PROFILE=1` under `--parallel` > 1: arms the prefill profiler
+  around the multi-stream engine's whole-chunk fills and reports once per prompt on every rank, which is what
+  produced the table above.
+- **`0073-tp-remainder-placement.patch`** - `TENSORFOLD_TP_REMAINDER=last` gives a split's remainder units to the
+  highest rank instead of rank 0 (MoE 640 / 640 / 768, heads 21 / 21 / 22). The straggler moves to rank 2 and
+  prefill is unchanged (the 6-unit rank still sets the pace), decode within noise - but **rank 0, the API host,
+  holds 9.1 GiB less**, and the shared KV pool (the minimum spare across ranks) grew 0.4-0.7M tokens here.
+
+To try one without rebuilding the image, bind-mount the patched file into every rank's container at the
+package path (`/usr/local/lib/python3.12/dist-packages/tensorfold/...`) - the upstream `start.sh` has no hook
+for extra `docker run` arguments, so that means a local edit of its `RUN_ARGS`.
+
+**Not attempted, measured case for it:** balance the routed experts exactly by splitting the sixteenth
+128-column unit by expert instead of by column (every rank keeps 5 units of every expert plus the 16th unit of
+96 of the 288 experts). Worth ~2.7% of prefill at 128K from the profile above, likely some decode; it needs
+ragged per-expert widths in the EXL3 MoE kernels.
 
 ## Pitfalls we hit
 
 - **The hotplug bandwidth trap** - above and in [the note](../../notes/gb10-cx7-hotplug-ltr.md).
 - **NetworkManager undoing runtime addresses** on a peer's reboot, and re-adding a `169.254` address that
   NCCL's two-node bootstrap then dials (`NCCL error 2: unhandled system error`).
-- **`TF_GLM_PROFILE=1` reports only the start-up warm-up chunk with `PARALLEL` > 1** - the multi-stream
-  engine's prompt path never arms it. Profile with `PARALLEL=1`.
+- **`TF_GLM_*` set in `local.sh` without `export` never reach the ranks**; read the running container's env.
 - **When a worker dies during start**, `start.sh` reports it but leaves rank 0's container running;
   `./stop.sh` clears it.
 
@@ -151,9 +201,9 @@ The API binds `0.0.0.0:8888` by default (upstream `HOST`). Keep it on a private 
 ## Trust notes
 
 - The engine image is the upstream recipe's prebuilt GHCR image, pinned by digest
-  (`sha256:14f15591...` for `v0.6.0-5e01f1bb74d8`); `prepare.sh` streams it to the workers over the link.
+  (`sha256:ef83797d...` for `v0.6.0-9f73cca659a1`).
 - **DFlash2 (`incoai/GLM-5.3-Flash-DFlash2`) is CC BY-NC-ND 4.0, non-commercial.** For commercial use set
-  `DRAFTER=mtp` before the first start (one request at a time, ~5-10% slower decode).
+  `DRAFTER=mtp` before the first start (one request at a time on v1.5).
 - Read the checkpoint's model card for its license and attribution terms before you serve it.
 
 ## Credits

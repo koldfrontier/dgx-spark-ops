@@ -1,4 +1,4 @@
-# scripts/local.sh for MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold at three Sparks.
+# scripts/local.sh for MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold (v1.5) at three Sparks.
 # Copy into the recipe's scripts/ on the head and fill in YOUR values (see "Finding your own values").
 # The environment wins over this file, so one-off overrides go on the command line.
 
@@ -11,9 +11,12 @@ WORKER_WEIGHTS=nfs
 # The rendezvous. Needed when the head's hostname resolves to a loopback address
 # (`getent hosts $(hostname)`); every worker must reach it. A LAN address is fine (setup traffic only).
 MASTER_ADDR=192.0.2.10
-# The recipe's own TP3 setting (upstream measured rank 0 at 8.4-10.6 GiB free with 27).
-KV_POOL_GIB=27
-# Measured here: 8 channels, prefill +1.4-3% over 4, decode unchanged (two boots each).
+# KV pool: leave the recipe's TP3 default (v1.5: 32 GiB cap, reserve growing with PARALLEL).
+# Measured here (v1.5): 8 channels, prefill +2.5% at 32K over 4 (one start against three); 16 adds nothing.
 NCCL_CHANNELS=8
+# Prompt chunks of 4096 rows (default 2048; three starts each): prefill +6% at 32K, +5% at 128K, decode unchanged,
+# +1.6 GiB on rank 0.
+# Must be exported: start.sh passes only exported TF_GLM_* variables to the ranks.
+export TF_GLM_PREFILL_ROWS=4096
 # COMM is NOT read from this file at three Sparks (start-tp3.sh exports it first). Start with:
-#   COMM=roce ./start-tp3.sh
+#   COMM=roce ./start-tp3.sh        (decode +4-7% at 1-4 streams; neutral at 8 streams and for prefill)
