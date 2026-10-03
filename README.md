@@ -8,8 +8,8 @@ desktop AI machines.
 | Path | What it is |
 |---|---|
 | [`design/cooling-cage`](design/cooling-cage) | Screwless 3D-printed active-cooling cage for two units, with three 120 mm fans. Print files, CAD source, and a full assembly guide. |
-| [`recipes`](recipes) | Reproducible multi-node inference serving configs — launch scripts, boot profiles, tuning data, and honest trust/security notes for specific model checkpoints. Two-node and four-node. |
-| [`notes`](notes) | Operational findings that outlive any one model: running four Sparks as a switchless RoCE ring, what the topology costs, and the failure modes that look like a healthy container. |
+| [`recipes`](recipes) | Reproducible multi-node inference serving configs — launch scripts, boot profiles, tuning data, and honest trust/security notes for specific model checkpoints. Two-, three- and four-node. |
+| [`notes`](notes) | Operational findings that outlive any one model: running four Sparks as a switchless RoCE ring, what the topology costs, the failure modes that look like a healthy container, and the re-cabling trap that silently costs a GB10 7/8 of its RDMA bandwidth. |
 
 More to follow.
 

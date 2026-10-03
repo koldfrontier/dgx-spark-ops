@@ -1,0 +1,19 @@
+# scripts/local.sh for MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold at three Sparks.
+# Copy into the recipe's scripts/ on the head and fill in YOUR values (see "Finding your own values").
+# The environment wins over this file, so one-off overrides go on the command line.
+
+# Rank 1: ssh target on the head<->rank-1 cable (the worker's address on that link).
+WORKER=admin@10.100.61.2
+# Rank 2: ssh target on the rank-2<->head cable.
+WORKER2=admin@10.100.65.1
+# Workers read the checkpoint from the head's HF cache over NFS (export it to every worker link address).
+WORKER_WEIGHTS=nfs
+# The rendezvous. Needed when the head's hostname resolves to a loopback address
+# (`getent hosts $(hostname)`); every worker must reach it. A LAN address is fine (setup traffic only).
+MASTER_ADDR=192.0.2.10
+# The recipe's own TP3 setting (upstream measured rank 0 at 8.4-10.6 GiB free with 27).
+KV_POOL_GIB=27
+# Measured here: 8 channels, prefill +1.4-3% over 4, decode unchanged (two boots each).
+NCCL_CHANNELS=8
+# COMM is NOT read from this file at three Sparks (start-tp3.sh exports it first). Start with:
+#   COMM=roce ./start-tp3.sh
