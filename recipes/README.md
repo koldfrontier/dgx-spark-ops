@@ -1,8 +1,8 @@
 # Recipes
 
 Reproducible serving configs for specific model checkpoints on **DGX Spark /
-ASUS Ascent GX10** clusters — two nodes or four. Each recipe is a standalone
-directory:
+ASUS Ascent GX10** clusters — two nodes or four — plus one single-GPU recipe for
+the estate's Tesla V100 workstation. Each recipe is a standalone directory:
 launch scripts, what's genericized vs. what you need to fill in for your own
 hardware, trust notes on any third-party image or toolkit involved, and
 honest tuning/benchmark data from the hardware it was developed on — not
@@ -13,6 +13,7 @@ vendor claims taken at face value.
 | [`SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks`](SuperDeepseek-V4-Flash-abliterated-MQ-Dual-DGX-Sparks) | [`Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX`](https://huggingface.co/Jiunsong/SuperDeepseek-V4-Flash-abliterated-MQ-2xDGX) | 304B-class MoE, 1M context, checkpoint author's forked vLLM runtime |
 | [`Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks`](Qwen3.8-Flash-Next-FP8-Dual-DGX-Sparks) | [`Qwen/Qwen3.8-Flash-Next-FP8`](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8) | Native FP8, MTP speculative decoding, vision, 262K context |
 | [`DeepSeek-V4.1-Flash-Quad-DGX-Sparks`](DeepSeek-V4.1-Flash-Quad-DGX-Sparks) | [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) | **Four** nodes on a switchless ring — no switch required. 300K / 500K / 1M context, DSpark speculation, vision + tools, boot profiles, Engram fast staging |
+| [`Swift-1.5-IQ3_S-Strata-Single-Tesla-V100`](Swift-1.5-IQ3_S-Strata-Single-Tesla-V100) | [`ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF`](https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF) IQ3_S | **Not a Spark:** one Tesla V100-PCIE-32GB with Strata (experts in host RAM), 262K context; PR #3411's Volta switches, KV streaming and one slot: 88-93 tok/s code decode, sanity 12/12; raw data in Strata PR #4717 |
 | [`GLM-5.3-Flash-EXL3-TensorFold-Triple-DGX-Sparks`](GLM-5.3-Flash-EXL3-TensorFold-Triple-DGX-Sparks) | [`Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold`](https://huggingface.co/Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold) | Three nodes as a switchless triangle on MiaAI-Lab's TensorFold recipe v1.5; fabric health check; three measured speed settings, a noise-aware map of what does not help, a per-rank profile, two optional engine patches |
 
 ## Conventions across recipes
