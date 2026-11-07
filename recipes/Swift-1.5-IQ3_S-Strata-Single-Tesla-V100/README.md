@@ -113,14 +113,26 @@ What did **not** help:
 
 ## Hardware notes (the reference box: HP Z6 G4)
 
-- 2x Xeon Gold 6138, 192 GB DDR4-2666 with 3 of 6 channels per socket, Tesla V100-PCIE-32GB (passive, own blower) on
-  PCIe Gen3 x16 (12.3 GB/s measured), NUMA on.
+- 2x Xeon Gold 6138, 192 GB DDR4-2666 with 3 of 6 channels per socket, Tesla V100-PCIE-32GB (passive, with a 12 V
+  blower on its end at a fixed 100%) on PCIe Gen3 x16, NUMA on.
+- **`iommu=pt`** on the kernel command line. With the default translated IOMMU domain, pinned copies ran at 7.3 / 7.9
+  GB/s (host-to-device / device-to-host); with passthrough, 12.3 / 13.2 GB/s. Strata streams experts and KV over this
+  link.
 - **It froze twice under sustained full CPU and GPU load**: a hard hang with nothing in the logs, which panic-on-lockup
-  did not catch.
-  - Workaround in place: BIOS fan floors raised to 50%, and the CPU capped at 2.7 GHz (`scaling_max_freq`).
-  - Cause not established; HP forum reports describe the same freeze on dual high-TDP Xeons in this chassis.
-  - **Every number in this recipe is under that cap.**
-- The V100 stayed at or below 77 C in these runs, with no thermal-violation samples.
+  did not catch. HP forum reports describe the same freeze on dual high-TDP Xeons in Z6 and Z8 G4s.
+  - The chassis fans follow the CPU and system sensors, not a passive card. In a 30-minute full CPU + V100 burn,
+    every fan stayed within 2% of its idle rpm.
+  - **Fix: raise the BIOS floors "Increase Idle Fan Speed" and "Increase PCIe Idle Fan Speed".** At 50/50 the box
+    passed a 30-minute combined burn; it runs at 65/65 since 2026-10-31, also with a 30-minute burn passed, and has
+    not frozen since.
+  - Load `hp-wmi-sensors` (kernel 6.5+, not loaded by default) to see every fan's rpm in `sensors`.
+  - A 2.7 GHz CPU cap (`scaling_max_freq`) was the stopgap until 2026-10-31 and is removed. The numbers in this recipe
+    were measured under it. A rerun of Strata's standard benchmark with turbo uncapped (Qwen IQ3_S, 2026-10-31)
+    matched the capped runs to under 1% on prompt speed, and decode was inside its run-to-run range.
+  - The riser CPU (socket 1) also thermal-tripped once under a compile before its heatsink was replaced and repasted.
+    If it idles hotter than the board CPU, check that first.
+- The V100 stayed at or below 77 C in these runs, with no thermal-violation samples. A 250 W burn takes it to 82-83 C,
+  where it slows itself.
 
 ## Files
 
@@ -132,9 +144,14 @@ What did **not** help:
 
 ## Status
 
-Serving on the reference box since 2026-10-30: S1, with Qwen3.8-Flash-Next IQ3_S's config in the same S1 form kept as
-the fallback. That model gave 57.7 -> 92.9 tok/s (4K code) with the same change, sanity 12/12. Measured on 0.1.52;
-newer Strata versions may change these numbers.
+Swift 1.5 served in this S1 form on the reference box on 2026-10-30. Since 2026-10-30 evening the box serves plain
+Qwen3.8-Flash-Next IQ3_S in the same S1 form instead: same switches, `--kv-resident 32768`, one slot, plus
+`"tool_call_recovery": true` and pictures through Strata's CPU vision reader (the model's own mmproj, so no VRAM).
+
+- The S1 form took that model from 57.7 to 92.9 tok/s (4K code), sanity 12/12.
+- With tool-call recovery and pictures added: 96.9 / 67.5 tok/s at 4K (code / prose), 98.7 / 65.9 at 16K, sanity 12/12.
+
+Measured on 0.1.52; newer Strata versions may change these numbers.
 
 ## License
 
