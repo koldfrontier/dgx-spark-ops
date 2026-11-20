@@ -132,7 +132,8 @@ What did **not** help:
   - The riser CPU (socket 1) also thermal-tripped once under a compile before its heatsink was replaced and repasted.
     If it idles hotter than the board CPU, check that first.
 - The V100 stayed at or below 77 C in these runs, with no thermal-violation samples. A 250 W burn takes it to 82-83 C,
-  where it slows itself.
+  where it slows itself. That was with a 180-degree U-duct on the blower; a shorter straight duct is in
+  [`design/v100-blower-duct`](../../design/v100-blower-duct) (not yet compared under load).
 
 ## Files
 

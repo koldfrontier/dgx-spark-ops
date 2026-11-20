@@ -8,6 +8,7 @@ desktop AI machines.
 | Path | What it is |
 |---|---|
 | [`design/cooling-cage`](design/cooling-cage) | Screwless 3D-printed active-cooling cage for two units, with three 120 mm fans. Print files, CAD source, and a full assembly guide. |
+| [`design/v100-blower-duct`](design/v100-blower-duct) | Short straight duct that puts a slim 25 mm blower on the end of a passive Tesla V100 / P40 card; the fan slides in. Print files (incl. a Bambu Studio project), CAD and the parametric Fusion script. |
 | [`recipes`](recipes) | Reproducible multi-node inference serving configs — launch scripts, boot profiles, tuning data, and honest trust/security notes for specific model checkpoints. Two-, three- and four-node, plus one single-GPU recipe for a Tesla V100 workstation. |
 | [`notes`](notes) | Operational findings that outlive any one model: running four Sparks as a switchless RoCE ring, what the topology costs, the failure modes that look like a healthy container, and the re-cabling trap that silently costs a GB10 7/8 of its RDMA bandwidth. |
 
@@ -19,4 +20,5 @@ Code and text in this repository are **Apache-2.0** (see [`LICENSE`](LICENSE)).
 
 3D models are licensed separately as **CC BY 4.0** — see the `LICENSE-CC-BY-4.0.txt` file
 alongside the model in question. In short: use, remix and sell derivatives freely, just credit
-the source.
+the source. The one exception is [`design/v100-blower-duct`](design/v100-blower-duct): it remixes a
+CC BY-NC-SA 4.0 model, so it is CC BY-NC-SA 4.0 (non-commercial, share-alike).
